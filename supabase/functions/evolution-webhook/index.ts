@@ -195,7 +195,8 @@ Deno.serve(async (req: Request) => {
 
       const effectivePhone = identity?.canonical_phone || canonicalPhone
       const rawEffectiveJid =
-        (identity as any)?.phone_jid || (effectivePhone ? `${effectivePhone}@s.whatsapp.net` : remoteJid)
+        (identity as any)?.phone_jid ||
+        (effectivePhone ? `${effectivePhone}@s.whatsapp.net` : remoteJid)
       const effectiveJid = normalizeJid(rawEffectiveJid)
 
       let { data: contact } = await supabase
