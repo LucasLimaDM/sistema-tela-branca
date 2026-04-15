@@ -243,6 +243,7 @@ Deno.serve(async (req: Request) => {
       } else {
         const updatePayload: any = { last_message_at: timestamp, pipeline_stage: 'Em Conversa' }
         if (
+          !fromMe &&
           pushName &&
           pushName !== 'Unknown' &&
           (!contact.push_name || contact.push_name === 'Unknown' || /^\d+$/.test(contact.push_name))
