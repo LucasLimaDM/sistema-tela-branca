@@ -1,7 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js'
 import { corsHeaders } from '../_shared/cors.ts'
-import { extractCanonicalPhone } from '../_shared/utils.ts'
+import { extractCanonicalPhone, resolveLidToPhone } from '../_shared/utils.ts'
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
@@ -105,16 +105,22 @@ Deno.serve(async (req: Request) => {
           if (id.phone_jid && id.canonical_phone) identityMap.set(id.phone_jid, id.canonical_phone)
         })
 
-        const missingJids = validJids.filter((jid) => {
+        const missingJids = []
+        for (const jid of validJids) {
           let canonicalPhone = identityMap.get(jid) || extractCanonicalPhone({ remoteJid: jid })
-          if (contactMap.has(jid)) return false
-          if (canonicalPhone && phoneMap.has(canonicalPhone)) return false
-          if (jid.includes('@s.whatsapp.net')) {
-            const phone = jid.split('@')[0]
-            if (phoneMap.has(phone)) return false
+          if (!canonicalPhone && jid.includes('@lid') && evoUrl && evoKey) {
+            canonicalPhone = await resolveLidToPhone(evoUrl, evoKey, integration.instance_name, jid)
+            if (canonicalPhone) identityMap.set(jid, canonicalPhone)
           }
-          return true
-        })
+          let skip = false
+          if (contactMap.has(jid)) skip = true
+          else if (canonicalPhone && phoneMap.has(canonicalPhone)) skip = true
+          else if (jid.includes('@s.whatsapp.net')) {
+            const phone = jid.split('@')[0]
+            if (phoneMap.has(phone)) skip = true
+          }
+          if (!skip) missingJids.push(jid)
+        }
 
         if (missingJids.length > 0) {
           const newContacts = missingJids.map((jid) => {
@@ -169,6 +175,16 @@ Deno.serve(async (req: Request) => {
         for (const jid of validJids) {
           try {
             let canonicalPhone = identityMap.get(jid) || extractCanonicalPhone({ remoteJid: jid })
+
+            if (!canonicalPhone && jid.includes('@lid') && evoUrl && evoKey) {
+              canonicalPhone = await resolveLidToPhone(
+                evoUrl,
+                evoKey,
+                integration.instance_name,
+                jid,
+              )
+              if (canonicalPhone) identityMap.set(jid, canonicalPhone)
+            }
 
             let contactId = contactMap.get(jid)
             if (!contactId && canonicalPhone) {

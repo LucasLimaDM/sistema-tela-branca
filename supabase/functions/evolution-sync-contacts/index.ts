@@ -1,7 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js'
 import { corsHeaders } from '../_shared/cors.ts'
-import { extractCanonicalPhone } from '../_shared/utils.ts'
+import { extractCanonicalPhone, resolveLidToPhone } from '../_shared/utils.ts'
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -116,7 +116,12 @@ Deno.serve(async (req: Request) => {
         for (const c of validChats) {
           let jid = c.remoteJid || c.jid || c.id
 
-          const canonicalPhone = extractCanonicalPhone(c)
+          let canonicalPhone = extractCanonicalPhone(c)
+
+          if (jid && jid.includes('@lid') && !canonicalPhone && evoUrl && evoKey) {
+            canonicalPhone = await resolveLidToPhone(evoUrl, evoKey, integration.instance_name, jid)
+          }
+
           let phoneJid = jid && jid.includes('@s.whatsapp.net') ? jid : null
           let lidJid = jid && jid.includes('@lid') ? jid : null
 

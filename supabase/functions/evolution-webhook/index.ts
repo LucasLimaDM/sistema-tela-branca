@@ -1,6 +1,6 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { extractCanonicalPhone } from '../_shared/utils.ts'
+import { extractCanonicalPhone, resolveLidToPhone } from '../_shared/utils.ts'
 import { processAiResponse } from './ai-handler.ts'
 
 Deno.serve(async (req: Request) => {
@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: integ } = await supabase
       .from('user_integrations')
-      .select('id, user_id')
+      .select('id, user_id, evolution_api_url, evolution_api_key')
       .eq('instance_name', instanceName)
       .single()
     if (!integ) {
@@ -102,7 +102,15 @@ Deno.serve(async (req: Request) => {
       }
 
       const pushName = msgObj.pushName || msgObj.verifiedName || msgObj.name || 'Unknown'
-      const canonicalPhone = extractCanonicalPhone({ remoteJid, ...msgObj, ...key })
+      let canonicalPhone = extractCanonicalPhone({ remoteJid, ...msgObj, ...key })
+
+      const evoUrlRaw = integ.evolution_api_url || Deno.env.get('EVOLUTION_API_URL')
+      const evoUrl = evoUrlRaw ? evoUrlRaw.replace(/\/$/, '') : ''
+      const evoKey = integ.evolution_api_key || Deno.env.get('EVOLUTION_API_KEY')
+
+      if (remoteJid && remoteJid.includes('@lid') && !canonicalPhone && evoUrl && evoKey) {
+        canonicalPhone = await resolveLidToPhone(evoUrl, evoKey, instanceName, remoteJid)
+      }
 
       let type = 'text'
       let text = '[Media/Unsupported]'

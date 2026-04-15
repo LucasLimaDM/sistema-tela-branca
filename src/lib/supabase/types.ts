@@ -428,6 +428,7 @@ export const Constants = {
 //   is_active: boolean (nullable, default: false)
 //   created_at: timestamp with time zone (nullable, default: now())
 //   updated_at: timestamp with time zone (nullable, default: now())
+//   is_default: boolean (not null, default: false)
 // Table: contact_identity
 //   id: uuid (not null, default: gen_random_uuid())
 //   instance_id: uuid (not null)
@@ -530,6 +531,21 @@ export const Constants = {
 //     USING: (auth.uid() = user_id)
 
 // --- DATABASE FUNCTIONS ---
+// FUNCTION handle_default_agent()
+//   CREATE OR REPLACE FUNCTION public.handle_default_agent()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//   AS $function$
+//   BEGIN
+//       IF NEW.is_default = true THEN
+//           UPDATE public.ai_agents
+//           SET is_default = false
+//           WHERE user_id = NEW.user_id AND id != NEW.id;
+//       END IF;
+//       RETURN NEW;
+//   END;
+//   $function$
+//
 // FUNCTION merge_whatsapp_contacts(uuid, uuid, uuid[])
 //   CREATE OR REPLACE FUNCTION public.merge_whatsapp_contacts(p_user_id uuid, p_primary_contact_id uuid, p_secondary_contact_ids uuid[])
 //    RETURNS void
@@ -581,6 +597,34 @@ export const Constants = {
 //   END;
 //   $function$
 //
+// FUNCTION route_new_contact_to_default_agent()
+//   CREATE OR REPLACE FUNCTION public.route_new_contact_to_default_agent()
+//    RETURNS trigger
+//    LANGUAGE plpgsql
+//   AS $function$
+//   DECLARE
+//       default_agent_id uuid;
+//   BEGIN
+//       IF NEW.ai_agent_id IS NULL THEN
+//           SELECT id INTO default_agent_id
+//           FROM public.ai_agents
+//           WHERE user_id = NEW.user_id AND is_default = true
+//           LIMIT 1;
+//
+//           IF default_agent_id IS NOT NULL THEN
+//               NEW.ai_agent_id := default_agent_id;
+//           END IF;
+//       END IF;
+//       RETURN NEW;
+//   END;
+//   $function$
+//
+
+// --- TRIGGERS ---
+// Table: ai_agents
+//   ensure_single_default_agent: CREATE TRIGGER ensure_single_default_agent BEFORE INSERT OR UPDATE OF is_default ON public.ai_agents FOR EACH ROW WHEN ((new.is_default = true)) EXECUTE FUNCTION handle_default_agent()
+// Table: whatsapp_contacts
+//   route_contact_to_agent: CREATE TRIGGER route_contact_to_agent BEFORE INSERT ON public.whatsapp_contacts FOR EACH ROW EXECUTE FUNCTION route_new_contact_to_default_agent()
 
 // --- INDEXES ---
 // Table: contact_identity
