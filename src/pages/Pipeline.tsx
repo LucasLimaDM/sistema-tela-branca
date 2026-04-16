@@ -53,11 +53,6 @@ export default function Pipeline() {
     return () => clearInterval(int)
   }, [contacts])
 
-  useEffect(() => {
-    const int = setInterval(() => supabase.functions.invoke('ai-pipeline-monitor'), 60000)
-    return () => clearInterval(int)
-  }, [])
-
   const handleMoveContact = async (contactId: string, newStage: string) => {
     if (contacts.find((c) => c.id === contactId)?.pipeline_stage === newStage) return
     const prom = supabase

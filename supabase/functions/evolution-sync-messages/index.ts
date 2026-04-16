@@ -232,10 +232,11 @@ Deno.serve(async (req: Request) => {
             }
 
             let page = 1
-            let hasMore = true
+            let totalPages = 1
             let allMessages: any[] = []
+            const MAX_PAGES = 200
 
-            while (hasMore) {
+            while (page <= totalPages && page <= MAX_PAGES) {
               const messagesUrl = `${evoUrl}/chat/findMessages/${integration.instance_name}`
               const msgRes = await fetch(messagesUrl, {
                 method: 'POST',
@@ -248,33 +249,27 @@ Deno.serve(async (req: Request) => {
                 }),
               })
 
-              if (!msgRes.ok) {
-                break
-              }
+              if (!msgRes.ok) break
 
               const msgData = await msgRes.json()
               let messages: any[] = []
               if (Array.isArray(msgData)) messages = msgData
-              else if (msgData?.messages && Array.isArray(msgData.messages))
-                messages = msgData.messages
               else if (msgData?.messages?.records && Array.isArray(msgData.messages.records))
                 messages = msgData.messages.records
+              else if (msgData?.messages && Array.isArray(msgData.messages))
+                messages = msgData.messages
               else if (msgData?.data && Array.isArray(msgData.data)) messages = msgData.data
               else if (msgData?.records && Array.isArray(msgData.records))
                 messages = msgData.records
 
-              if (!messages || messages.length === 0) {
-                hasMore = false
-                break
-              }
+              if (!messages || messages.length === 0) break
 
               allMessages.push(...messages)
 
-              if (messages.length < 1000) {
-                hasMore = false
-              } else {
-                page++
+              if (page === 1 && typeof msgData?.messages?.pages === 'number') {
+                totalPages = msgData.messages.pages
               }
+              page++
             }
 
             if (allMessages.length === 0) {
@@ -303,7 +298,7 @@ Deno.serve(async (req: Request) => {
               }
             }
 
-            const mappedMessages = allMessages
+            const mappedRaw = allMessages
               .map((m: any) => {
                 const messageId = m.key?.id
                 if (!messageId) return null
@@ -332,13 +327,27 @@ Deno.serve(async (req: Request) => {
                   raw: m,
                 }
               })
-              .filter(Boolean)
+              .filter(Boolean) as Array<{ message_id: string; [k: string]: any }>
+
+            // Evolution may return the same key.id twice (MessageUpdate variants).
+            // PG ON CONFLICT cannot touch the same row twice in one statement,
+            // so collapse duplicates before upserting.
+            const dedupMap = new Map<string, any>()
+            for (const row of mappedRaw) dedupMap.set(row.message_id, row)
+            const mappedMessages = Array.from(dedupMap.values())
 
             for (let i = 0; i < mappedMessages.length; i += 100) {
               const chunk = mappedMessages.slice(i, i + 100)
-              await supabaseClient
+              const { error: upsertErr } = await supabaseClient
                 .from('whatsapp_messages')
                 .upsert(chunk, { onConflict: 'user_id,message_id' })
+              if (upsertErr) {
+                console.error(
+                  `[ERROR] Upsert failed for ${jid} chunk ${i}-${i + chunk.length}:`,
+                  upsertErr,
+                )
+                throw upsertErr
+              }
             }
           } catch (contactErr) {
             console.error(`[ERROR] Failed processing messages for contact ${jid}`, contactErr)
@@ -362,8 +371,6 @@ Deno.serve(async (req: Request) => {
             processed_items: totalProcessed,
           })
           .eq('id', job.id)
-
-        await supabaseClient.functions.invoke('ai-classify-contacts', {})
       } catch (jobError) {
         console.error('[Background] Message sync failed:', jobError)
         await supabaseClient.from('import_jobs').update({ status: 'failed' }).eq('id', job.id)
