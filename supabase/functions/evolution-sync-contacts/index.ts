@@ -161,8 +161,7 @@ Deno.serve(async (req: Request) => {
               const updates: any = {}
               if (lidJid && existingIdentity.lid_jid !== lidJid) updates.lid_jid = lidJid
               if (phoneJid && existingIdentity.phone_jid !== phoneJid) updates.phone_jid = phoneJid
-              if (pushName && !existingIdentity.display_name)
-                updates.display_name = pushName
+              if (pushName && !existingIdentity.display_name) updates.display_name = pushName
               if (Object.keys(updates).length > 0) {
                 await supabaseClient
                   .from('contact_identity')

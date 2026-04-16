@@ -16,20 +16,30 @@ Deno.serve(async (req: Request) => {
 
     const integ = integrations?.[0]
 
-    const evoUrl = (integ?.evolution_api_url || Deno.env.get('EVOLUTION_API_URL') || '').replace(/\/$/, '')
+    const evoUrl = (integ?.evolution_api_url || Deno.env.get('EVOLUTION_API_URL') || '').replace(
+      /\/$/,
+      '',
+    )
     const evoKey = integ?.evolution_api_key || Deno.env.get('EVOLUTION_API_KEY') || ''
     const instance = integ?.instance_name || ''
 
     if (!evoUrl || !instance) {
-      return new Response(JSON.stringify({
-        debug: {
-          integration: integ,
-          env_evo_url: Deno.env.get('EVOLUTION_API_URL') ? 'SET' : 'NOT SET',
-          env_evo_key: Deno.env.get('EVOLUTION_API_KEY') ? 'SET' : 'NOT SET',
-          resolved_url: evoUrl,
-          resolved_instance: instance,
-        }
-      }, null, 2), { headers: { 'Content-Type': 'application/json' } })
+      return new Response(
+        JSON.stringify(
+          {
+            debug: {
+              integration: integ,
+              env_evo_url: Deno.env.get('EVOLUTION_API_URL') ? 'SET' : 'NOT SET',
+              env_evo_key: Deno.env.get('EVOLUTION_API_KEY') ? 'SET' : 'NOT SET',
+              resolved_url: evoUrl,
+              resolved_instance: instance,
+            },
+          },
+          null,
+          2,
+        ),
+        { headers: { 'Content-Type': 'application/json' } },
+      )
     }
 
     const url = new URL(req.url)
