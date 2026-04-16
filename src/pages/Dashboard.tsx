@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { getContactDisplayName } from '@/lib/format'
 import { useContacts } from '@/hooks/use-contacts'
 import { useLanguage, TranslationKey } from '@/hooks/use-language'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -353,12 +354,12 @@ export default function Dashboard() {
                         <Avatar className="h-11 w-11 border-2 border-border shadow-sm">
                           <AvatarImage src={contact.profile_picture_url || ''} />
                           <AvatarFallback className="bg-muted text-foreground font-semibold text-sm">
-                            {contact.push_name?.charAt(0) || '#'}
+                            {getContactDisplayName(contact, '').charAt(0) || '#'}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <p className="font-bold text-[15px] tracking-tight text-foreground group-hover:text-primary transition-colors">
-                            {contact.push_name || t('unknown')}
+                            {getContactDisplayName(contact, t('unknown'))}
                           </p>
                           <p className="text-[13px] text-muted-foreground font-semibold">
                             {contact.last_message_at
