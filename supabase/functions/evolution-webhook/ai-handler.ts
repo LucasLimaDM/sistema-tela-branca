@@ -7,6 +7,7 @@ export async function processAiResponse(
   contactId: string,
   supabaseUrl: string,
   supabaseKey: string,
+  triggerVersion: number,
 ) {
   console.log(
     `[AI Handler] Starting processAiResponse for userId: ${userId}, contactId: ${contactId}`,
@@ -46,6 +47,25 @@ export async function processAiResponse(
       console.log(
         `[AI Handler] Exiting: Assigned agent ${contact.ai_agent_id} is either inactive, deleted, or error loading.`,
       )
+      return
+    }
+
+    const messageDelay = agent.message_delay ?? 0
+
+    if (messageDelay > 0) {
+      console.log(`[AI Handler] Debounce: sleeping ${messageDelay}s for contact ${contactId} (triggerVersion: ${triggerVersion})`)
+      await new Promise((resolve) => setTimeout(resolve, messageDelay * 1000))
+    }
+
+    // Cancellation check 1: was a newer message received during the sleep?
+    const { data: contactVersion } = await supabase
+      .from('whatsapp_contacts')
+      .select('ai_trigger_version')
+      .eq('id', contactId)
+      .single()
+
+    if (contactVersion?.ai_trigger_version !== triggerVersion) {
+      console.log(`[AI Handler] Debounce: newer message arrived during delay, aborting (contact ${contactId}, expected v${triggerVersion}, got v${contactVersion?.ai_trigger_version})`)
       return
     }
 
@@ -141,6 +161,18 @@ export async function processAiResponse(
     console.log(
       `[AI Handler] Attempting to send message to Evolution API. Phone: ${contact.remote_jid}`,
     )
+
+    // Cancellation check 2: was a newer message received during the OpenRouter call?
+    const { data: contactVersionBeforeSend } = await supabase
+      .from('whatsapp_contacts')
+      .select('ai_trigger_version')
+      .eq('id', contactId)
+      .single()
+
+    if (contactVersionBeforeSend?.ai_trigger_version !== triggerVersion) {
+      console.log(`[AI Handler] Debounce: newer message arrived during LLM call, discarding response (contact ${contactId}, expected v${triggerVersion}, got v${contactVersionBeforeSend?.ai_trigger_version})`)
+      return
+    }
 
     const sendRes = await fetch(`${evoUrl}/message/sendText/${integration.instance_name}`, {
       method: 'POST',
