@@ -40,6 +40,8 @@ export default function Chat() {
   const topSentinelRef = useRef<HTMLDivElement>(null)
   const prevScrollHeightRef = useRef<number>(0)
   const loadMoreFnRef = useRef<() => void>(() => {})
+  const isLoadingMoreRef = useRef(false)
+  const isNearBottomRef = useRef(true)
 
   const [hasMore, setHasMore] = useState(true)
   const [isLoadingMore, setIsLoadingMore] = useState(false)
@@ -72,6 +74,8 @@ export default function Chat() {
       if (messagesData) {
         setMessages([...messagesData].reverse())
         setHasMore(messagesData.length === 200)
+      } else {
+        setHasMore(false)
       }
       setLoading(false)
       scrollToBottom()
@@ -102,40 +106,58 @@ export default function Chat() {
       )
       .subscribe()
 
+    const container = messagesContainerRef.current
+    const handleScroll = () => {
+      if (!container) return
+      const threshold = 150
+      isNearBottomRef.current =
+        container.scrollHeight - container.scrollTop - container.clientHeight < threshold
+    }
+    if (container) container.addEventListener('scroll', handleScroll)
+
     return () => {
       supabase.removeChannel(channel)
+      if (container) container.removeEventListener('scroll', handleScroll)
     }
   }, [user, id])
 
   const scrollToBottom = () => {
+    if (!isNearBottomRef.current) return
     setTimeout(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, 100)
   }
 
   const loadMoreMessages = useCallback(async () => {
-    if (isLoadingMore || !hasMore || !messages.length || !id) return
-
+    if (isLoadingMoreRef.current || !hasMore || !messages.length || !id) return
+    isLoadingMoreRef.current = true
     setIsLoadingMore(true)
     prevScrollHeightRef.current = messagesContainerRef.current?.scrollHeight ?? 0
 
-    const oldest = messages[0].timestamp
+    try {
+      const oldest = messages[0].timestamp
 
-    const { data } = await supabase
-      .from('whatsapp_messages')
-      .select('*')
-      .eq('contact_id', id)
-      .lt('timestamp', oldest)
-      .order('timestamp', { ascending: false })
-      .limit(50)
+      const { data } = await supabase
+        .from('whatsapp_messages')
+        .select('*')
+        .eq('contact_id', id)
+        .lt('timestamp', oldest)
+        .order('timestamp', { ascending: false })
+        .limit(50)
 
-    if (data) {
-      setMessages((prev) => [...[...data].reverse(), ...prev])
-      setHasMore(data.length === 50)
+      if (data) {
+        setMessages((prev) => {
+          const existingIds = new Set(prev.map((m) => m.id))
+          const newMsgs = [...data].reverse().filter((m) => !existingIds.has(m.id))
+          return [...newMsgs, ...prev]
+        })
+        setHasMore(data.length === 50)
+      }
+    } finally {
+      isLoadingMoreRef.current = false
+      setIsLoadingMore(false)
     }
-
-    setIsLoadingMore(false)
-  }, [isLoadingMore, hasMore, messages, id])
+  }, [hasMore, messages, id])
 
   useEffect(() => {
     loadMoreFnRef.current = loadMoreMessages
@@ -151,6 +173,7 @@ export default function Chat() {
   }, [messages.length])
 
   useEffect(() => {
+    if (loading) return
     const sentinel = topSentinelRef.current
     if (!sentinel) return
 
@@ -165,7 +188,7 @@ export default function Chat() {
 
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [])
+  }, [loading])
 
   const startEditing = () => {
     setIsEditingContact(true)
