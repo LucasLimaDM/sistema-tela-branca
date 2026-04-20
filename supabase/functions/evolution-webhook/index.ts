@@ -336,20 +336,28 @@ Deno.serve(async (req: Request) => {
               `[WEBHOOK] Skip AI processing: Message type is not text/conversation (type: ${type}, remoteJid: ${effectiveJid}, instance: ${instanceName})`,
             )
           } else {
-            console.log(
-              `[WEBHOOK] Triggering background AI task for contact ${contact.id} (remoteJid: ${effectiveJid})`,
-            )
-            if (
-              typeof (globalThis as any).EdgeRuntime !== 'undefined' &&
-              typeof (globalThis as any).EdgeRuntime.waitUntil === 'function'
-            ) {
-              ;(globalThis as any).EdgeRuntime.waitUntil(
-                processAiResponse(userId, contact.id, supabaseUrl, supabaseKey),
-              )
+            const { data: newVersion, error: versionError } = await supabase
+              .rpc('increment_ai_trigger_version', { p_contact_id: contact.id })
+
+            if (versionError || newVersion === null || newVersion === undefined) {
+              console.error(`[WEBHOOK] Failed to increment ai_trigger_version for contact ${contact.id}:`, versionError)
             } else {
-              processAiResponse(userId, contact.id, supabaseUrl, supabaseKey).catch((err: any) =>
-                console.error('[WEBHOOK] Background AI task failed:', err),
+              const myVersion = newVersion as number
+              console.log(
+                `[WEBHOOK] Triggering background AI task for contact ${contact.id} (remoteJid: ${effectiveJid}, triggerVersion: ${myVersion})`,
               )
+              if (
+                typeof (globalThis as any).EdgeRuntime !== 'undefined' &&
+                typeof (globalThis as any).EdgeRuntime.waitUntil === 'function'
+              ) {
+                ;(globalThis as any).EdgeRuntime.waitUntil(
+                  processAiResponse(userId, contact.id, supabaseUrl, supabaseKey, myVersion),
+                )
+              } else {
+                processAiResponse(userId, contact.id, supabaseUrl, supabaseKey, myVersion).catch((err: any) =>
+                  console.error('[WEBHOOK] Background AI task failed:', err),
+                )
+              }
             }
           }
         }
