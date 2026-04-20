@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback, useLayoutEffect } from 'react'
 import { getContactDisplayName, getContactDisplaySubtitle } from '@/lib/format'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
@@ -36,6 +36,13 @@ export default function Chat() {
   const [newMessage, setNewMessage] = useState('')
   const [isSending, setIsSending] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const topSentinelRef = useRef<HTMLDivElement>(null)
+  const prevScrollHeightRef = useRef<number>(0)
+  const loadMoreFnRef = useRef<() => void>(() => {})
+
+  const [hasMore, setHasMore] = useState(true)
+  const [isLoadingMore, setIsLoadingMore] = useState(false)
 
   // Editing contact state
   const [isEditingContact, setIsEditingContact] = useState(false)
@@ -59,9 +66,13 @@ export default function Chat() {
         .from('whatsapp_messages')
         .select('*')
         .eq('contact_id', id)
-        .order('timestamp', { ascending: true })
+        .order('timestamp', { ascending: false })
+        .limit(200)
 
-      if (messagesData) setMessages(messagesData)
+      if (messagesData) {
+        setMessages([...messagesData].reverse())
+        setHasMore(messagesData.length === 200)
+      }
       setLoading(false)
       scrollToBottom()
     }
@@ -101,6 +112,60 @@ export default function Chat() {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, 100)
   }
+
+  const loadMoreMessages = useCallback(async () => {
+    if (isLoadingMore || !hasMore || !messages.length || !id) return
+
+    setIsLoadingMore(true)
+    prevScrollHeightRef.current = messagesContainerRef.current?.scrollHeight ?? 0
+
+    const oldest = messages[0].timestamp
+
+    const { data } = await supabase
+      .from('whatsapp_messages')
+      .select('*')
+      .eq('contact_id', id)
+      .lt('timestamp', oldest)
+      .order('timestamp', { ascending: false })
+      .limit(50)
+
+    if (data) {
+      setMessages((prev) => [...[...data].reverse(), ...prev])
+      setHasMore(data.length === 50)
+    }
+
+    setIsLoadingMore(false)
+  }, [isLoadingMore, hasMore, messages, id])
+
+  useEffect(() => {
+    loadMoreFnRef.current = loadMoreMessages
+  }, [loadMoreMessages])
+
+  useLayoutEffect(() => {
+    if (prevScrollHeightRef.current > 0 && messagesContainerRef.current) {
+      const newScrollHeight = messagesContainerRef.current.scrollHeight
+      messagesContainerRef.current.scrollTop +=
+        newScrollHeight - prevScrollHeightRef.current
+      prevScrollHeightRef.current = 0
+    }
+  }, [messages.length])
+
+  useEffect(() => {
+    const sentinel = topSentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreFnRef.current()
+        }
+      },
+      { rootMargin: '120px', threshold: 0 },
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [])
 
   const startEditing = () => {
     setIsEditingContact(true)
@@ -307,7 +372,26 @@ export default function Chat() {
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-zinc-50/30 dark:bg-background/30 scrollbar-thin">
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-zinc-50/30 dark:bg-background/30 scrollbar-thin"
+        >
+          <div ref={topSentinelRef} className="h-px w-full" />
+
+          {isLoadingMore && (
+            <div className="flex justify-center py-3">
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground/50" />
+            </div>
+          )}
+
+          {!hasMore && messages.length > 0 && (
+            <div className="flex justify-center py-2">
+              <span className="text-[11px] font-bold text-muted-foreground/40 tracking-tight">
+                {language === 'pt' ? 'Início da conversa' : 'Start of conversation'}
+              </span>
+            </div>
+          )}
+
           {Object.entries(groupedMessages).map(([date, msgs]) => (
             <div key={date} className="space-y-6">
               <div className="flex justify-center my-4">
