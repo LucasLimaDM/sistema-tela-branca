@@ -52,6 +52,37 @@ function AppRoutes() {
   )
 }
 
+function AppRoutes() {
+  const { loading: authLoading } = useAuth()
+  const { loading: integrationLoading } = useIntegration()
+
+  if (authLoading || integrationLoading) return <SplashScreen />
+
+  return (
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<Index />} />
+        <Route path="/auth" element={<Auth />} />
+      </Route>
+
+      <Route path="/app" element={<DashboardLayout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="onboarding" element={<Onboarding />} />
+        <Route path="pipeline" element={<Pipeline />} />
+        <Route path="contacts" element={<Contacts />} />
+        <Route path="chat/:id" element={<Chat />} />
+        <Route path="agents" element={<Agents />} />
+      </Route>
+
+      <Route path="/settings" element={<DashboardLayout />}>
+        <Route index element={<Settings />} />
+      </Route>
+
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  )
+}
+
 const App = () => (
   <LanguageProvider>
     <BrowserRouter>

@@ -176,6 +176,11 @@ export const translations = {
     message_type_location: 'Location not yet supported',
     message_type_contact: 'Contact not yet supported',
     message_type_sticker: 'Sticker not yet supported',
+    message_type_media: 'Media not yet supported',
+    reaction_to_message: 'Reacted to a message',
+    reaction_removed: 'Removed a reaction',
+    message_deleted: 'Message deleted',
+    message_edited: 'edited',
   },
   pt: {
     sign_in: 'Entrar',
@@ -358,5 +363,10 @@ export const translations = {
     message_type_location: 'Localização ainda não suportada',
     message_type_contact: 'Contato ainda não suportado',
     message_type_sticker: 'Sticker ainda não suportado',
+    message_type_media: 'Mídia ainda não suportada',
+    reaction_to_message: 'Reagiu a uma mensagem',
+    reaction_removed: 'Removeu uma reação',
+    message_deleted: 'Mensagem apagada',
+    message_edited: 'editada',
   },
 }

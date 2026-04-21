@@ -1,4 +1,4 @@
-import { messageTypeConfig } from '@/lib/message-types'
+import { getMessageTypeConfig } from '@/lib/message-types'
 import { useLanguage } from '@/hooks/use-language'
 
 interface UnsupportedMessageProps {
@@ -7,10 +7,7 @@ interface UnsupportedMessageProps {
 
 export function UnsupportedMessage({ type }: UnsupportedMessageProps) {
   const { t } = useLanguage()
-  const config = messageTypeConfig[type]
-
-  if (!config) return null
-
+  const config = getMessageTypeConfig(type)
   const Icon = config.icon
 
   return (
