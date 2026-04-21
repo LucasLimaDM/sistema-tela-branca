@@ -34,7 +34,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: message, error: msgError } = await supabaseClient
       .from('whatsapp_messages')
-      .select('raw, contact_id')
+      .select('contact_id')
       .eq('message_id', messageId)
       .eq('contact_id', contactId)
       .single()
@@ -63,18 +63,23 @@ Deno.serve(async (req: Request) => {
     const evoUrl = evoUrlRaw ? evoUrlRaw.replace(/\/$/, '') : ''
     const evoKey = integration.evolution_api_key || Deno.env.get('EVOLUTION_API_KEY')
 
+    const downloadUrl = `${evoUrl}/chat/getBase64FromMediaMessage/${integration.instance_name}`
+
     const evoRes = await fetch(
-      `${evoUrl}/message/download-media/${integration.instance_name}`,
+      downloadUrl,
       {
         method: 'POST',
         headers: { apikey: evoKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message.raw }),
+        body: JSON.stringify({
+          message: { key: { id: messageId } },
+          convertToMp4: false,
+        }),
       },
     )
 
     if (!evoRes.ok) {
       const errText = await evoRes.text()
-      console.error('[evolution-get-media] Evolution API error:', errText)
+      console.error('[evolution-get-media] Evolution API error:', evoRes.status, errText)
       return new Response(JSON.stringify({ error: 'Media download failed', detail: errText }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

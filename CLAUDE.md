@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-pnpm dev          # Start dev server on port 8080
+pnpm dev --port 8085  # Start dev server — always use port 8085
 pnpm build        # Production build (dist/)
 pnpm build:dev    # Dev build with sourcemaps (dev-dist/)
 pnpm lint         # oxlint src

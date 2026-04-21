@@ -27,6 +27,11 @@ export const translations = {
     already_have_account: 'Already have an account?',
     dont_have_account: "Don't have an account?",
     account_created: 'Account created!',
+    check_email_title: 'Check your email',
+    check_email_desc: 'We sent a confirmation link to',
+    check_email_instruction: 'Click the link to activate your account. You can open it on any device — phone, desktop, incognito.',
+    check_email_spam: 'If you don\'t see it, check your spam folder.',
+    back_to_login: 'Back to login',
 
     overview: 'Overview',
     crm_health: 'Your CRM health and recent insights.',
@@ -200,6 +205,11 @@ export const translations = {
     already_have_account: 'Já tem uma conta?',
     dont_have_account: 'Não tem uma conta?',
     account_created: 'Conta criada!',
+    check_email_title: 'Verifique seu email',
+    check_email_desc: 'Enviamos um link de confirmação para',
+    check_email_instruction: 'Clique no link para ativar sua conta. Pode abrir em qualquer dispositivo — celular, desktop, aba anônima.',
+    check_email_spam: 'Se não encontrar, verifique a pasta de spam.',
+    back_to_login: 'Voltar ao login',
 
     overview: 'Visão Geral',
     crm_health: 'Saúde do seu CRM e insights recentes.',
