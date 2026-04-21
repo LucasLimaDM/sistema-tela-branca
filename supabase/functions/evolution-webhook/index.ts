@@ -115,7 +115,7 @@ Deno.serve(async (req: Request) => {
       }
 
       let type = 'text'
-      let text = '[Media/Unsupported]'
+      let text: string | null = null
 
       const content = msgObj.message
       if (typeof content === 'string') {
@@ -130,7 +130,7 @@ Deno.serve(async (req: Request) => {
           content.templateMessage?.hydratedTemplate?.hydratedContentText ||
           content.templateMessage?.hydratedTemplate?.hydratedTitleText ||
           msgObj.text ||
-          '[Media/Unsupported]'
+          null
 
         type = Object.keys(content).filter((k: string) => k !== 'messageContextInfo')[0] || 'text'
       } else if (msgObj.text) {

@@ -1,4 +1,4 @@
-import { Image, Video, FileText, MapPin, Contact2, Smile, type LucideIcon } from 'lucide-react'
+import { Image, Video, FileText, MapPin, Contact2, Smile, File, type LucideIcon } from 'lucide-react'
 import { type TranslationKey } from '@/hooks/use-language'
 
 export type MessageTypeInfo = {
@@ -23,6 +23,11 @@ export const messageTypeConfig: Record<string, MessageTypeInfo> = {
     translationKey: 'message_type_document',
     icon: FileText,
   },
+  documentWithCaptionMessage: {
+    label: 'document',
+    translationKey: 'message_type_document',
+    icon: FileText,
+  },
   locationMessage: {
     label: 'location',
     translationKey: 'message_type_location',
@@ -40,8 +45,38 @@ export const messageTypeConfig: Record<string, MessageTypeInfo> = {
   },
 }
 
+// Types that are rendered by their own dedicated components (not the generic unsupported fallback)
+const HANDLED_TYPES = new Set([
+  'text',
+  'conversation',
+  'extendedTextMessage',
+  'audioMessage',
+  'pttMessage',
+  'reactionMessage',
+  'protocolMessage',
+])
+
 export const isUnsupportedMessageType = (type: string | null): boolean => {
   if (type === null) return false
-  if (type === 'text' || type === 'audioMessage' || type === 'pttMessage') return false
-  return type in messageTypeConfig
+  return !HANDLED_TYPES.has(type)
+}
+
+// Sentinel string the webhook stores when it can't extract readable text from a message.
+// Historical data contains this literal; new data should use null (see evolution-webhook).
+export const UNSUPPORTED_TEXT_SENTINEL = '[Media/Unsupported]'
+
+// True when a "text-type" message has no displayable content and should fall back
+// to the generic unsupported-media UI instead of rendering raw text.
+export const hasUnrenderableText = (text: string | null | undefined): boolean => {
+  if (text === null || text === undefined) return true
+  const trimmed = text.trim()
+  return trimmed === '' || trimmed === UNSUPPORTED_TEXT_SENTINEL
+}
+
+export const getMessageTypeConfig = (type: string): MessageTypeInfo => {
+  return messageTypeConfig[type] ?? {
+    label: 'media',
+    translationKey: 'message_type_media',
+    icon: File,
+  }
 }

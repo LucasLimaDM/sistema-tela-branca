@@ -307,7 +307,7 @@ Deno.serve(async (req: Request) => {
                   m.message?.extendedTextMessage?.text ||
                   m.message?.templateMessage?.hydratedTemplate?.hydratedContentText ||
                   m.message?.templateMessage?.hydratedTemplate?.hydratedTitleText ||
-                  '[Media/Unsupported]'
+                  null
                 let timestamp = new Date().toISOString()
                 if (m.messageTimestamp) {
                   const ts =
