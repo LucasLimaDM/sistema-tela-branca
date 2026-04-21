@@ -164,6 +164,13 @@ export const translations = {
     contact_updated: 'Contact updated successfully',
     error_save: 'Failed to save changes',
     send: 'Send',
+
+    message_type_image: 'Image not yet supported',
+    message_type_video: 'Video not yet supported',
+    message_type_document: 'Document not yet supported',
+    message_type_location: 'Location not yet supported',
+    message_type_contact: 'Contact not yet supported',
+    message_type_sticker: 'Sticker not yet supported',
   },
   pt: {
     sign_in: 'Entrar',
@@ -334,5 +341,12 @@ export const translations = {
     contact_updated: 'Contato atualizado com sucesso',
     error_save: 'Falha ao salvar alterações',
     send: 'Enviar',
+
+    message_type_image: 'Imagem ainda não suportada',
+    message_type_video: 'Vídeo ainda não suportado',
+    message_type_document: 'Documento ainda não suportado',
+    message_type_location: 'Localização ainda não suportada',
+    message_type_contact: 'Contato ainda não suportado',
+    message_type_sticker: 'Sticker ainda não suportado',
   },
 }

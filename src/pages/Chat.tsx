@@ -23,6 +23,8 @@ import { ptBR, enUS } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
 import { useAudioPreloader } from '@/hooks/use-audio-preloader'
 import { AudioPlayer } from '@/components/chat/AudioPlayer'
+import { isUnsupportedMessageType } from '@/lib/message-types'
+import { UnsupportedMessage } from '@/components/chat/UnsupportedMessage'
 
 export default function Chat() {
   const { id } = useParams()
@@ -466,6 +468,8 @@ export default function Chat() {
                             isLoading={(audioMap.get(msg.message_id)?.status ?? 'loading') === 'loading'}
                             fromMe={msg.from_me}
                           />
+                        ) : isUnsupportedMessageType(msg.type) ? (
+                          <UnsupportedMessage type={msg.type!} />
                         ) : (
                           <span className="whitespace-pre-wrap break-words">{msg.text}</span>
                         )}
