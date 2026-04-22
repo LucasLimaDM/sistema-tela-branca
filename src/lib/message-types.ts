@@ -54,6 +54,9 @@ const HANDLED_TYPES = new Set([
   'pttMessage',
   'reactionMessage',
   'protocolMessage',
+  'imageMessage',
+  'videoMessage',
+  'stickerMessage',
 ])
 
 export const isUnsupportedMessageType = (type: string | null): boolean => {
