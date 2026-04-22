@@ -105,7 +105,7 @@ Deno.serve(async (req: Request) => {
       status: 200,
       headers: {
         ...corsHeaders,
-        'Content-Type': mimetype || 'audio/ogg',
+        'Content-Type': mimetype || 'application/octet-stream',
         'Cache-Control': 'private, max-age=3600',
       },
     })
