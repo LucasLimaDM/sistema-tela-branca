@@ -28,7 +28,7 @@ import { ImageMessage } from '@/components/chat/ImageMessage'
 import { VideoMessage } from '@/components/chat/VideoMessage'
 import { StickerMessage } from '@/components/chat/StickerMessage'
 import { MediaLightbox } from '@/components/chat/MediaLightbox'
-import { isUnsupportedMessageType, hasUnrenderableText } from '@/lib/message-types'
+import { isUnsupportedMessageType, hasUnrenderableText, SILENT_MESSAGE_TYPES } from '@/lib/message-types'
 import { UnsupportedMessage } from '@/components/chat/UnsupportedMessage'
 import { ReactionMessage } from '@/components/chat/ReactionMessage'
 import { ProtocolMessage } from '@/components/chat/ProtocolMessage'
@@ -310,7 +310,7 @@ export default function Chat() {
   }
 
   const groupedMessages: { [key: string]: WhatsAppMessage[] } = {}
-  messages.forEach((msg) => {
+  messages.filter((msg) => !SILENT_MESSAGE_TYPES.has(msg.type ?? '')).forEach((msg) => {
     const dateStr = formatMessageDate(msg.timestamp || msg.created_at || new Date().toISOString())
     if (!groupedMessages[dateStr]) groupedMessages[dateStr] = []
     groupedMessages[dateStr].push(msg)

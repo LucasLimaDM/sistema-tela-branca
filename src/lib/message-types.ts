@@ -64,6 +64,16 @@ export const isUnsupportedMessageType = (type: string | null): boolean => {
   return !HANDLED_TYPES.has(type)
 }
 
+// WhatsApp protocol/coordination messages with no user-visible content.
+// albumMessage = grouping signal sent when multiple images are sent at once (actual images arrive as imageMessage).
+// associatedChildMessage = album child coordination message.
+// placeholderMessage = internal placeholder with no content.
+export const SILENT_MESSAGE_TYPES = new Set([
+  'albumMessage',
+  'associatedChildMessage',
+  'placeholderMessage',
+])
+
 // Sentinel string the webhook stores when it can't extract readable text from a message.
 // Historical data contains this literal; new data should use null (see evolution-webhook).
 export const UNSUPPORTED_TEXT_SENTINEL = '[Media/Unsupported]'
