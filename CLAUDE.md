@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code when working in this repo.
 
 ## Commands
 
@@ -14,13 +14,59 @@ pnpm format       # oxfmt (formatter)
 pnpm format:check # oxfmt --check
 ```
 
-No test suite exists (`test` script is a no-op).
+No test suite (`test` script no-op).
 
-To deploy an edge function:
+## After Every Implementation
+
+**MANDATORY checklist — never skip any step:**
+
+### 1. Schema changes (any migration added or DB column/table changed)
+```bash
+# a) Write migration with IF NOT EXISTS guards in supabase/migrations/
+# b) Regenerate TypeScript types:
+supabase gen types typescript --project-id fckenwdyghisdebqauxy > src/lib/supabase/types.ts
+```
+**Every schema change without a migration is technical debt that breaks AI and other features on the next FK-touching deploy. Always write the migration first.**
+
+### 2. Edge function changes
+Deploy EVERY modified function:
 ```bash
 supabase functions deploy <function-name> --no-verify-jwt
 ```
-**Always use `--no-verify-jwt`** — omitting it resets `verify_jwt` to `true` (Supabase default), causing the API gateway to return 401 before the function runs.
+**Always use `--no-verify-jwt`** — omitting resets `verify_jwt` to `true`, causing 401 before function runs.
+
+Functions that touch `ai_agents` or `user_api_keys` → run AI smoke test after deploy (step 3).
+
+### 3. AI agent smoke test (after any change touching evolution-webhook, ai-handler, ai_agents, user_api_keys)
+```bash
+curl "https://fckenwdyghisdebqauxy.supabase.co/functions/v1/evolution-debug?endpoint=test-ai" \
+  -H "Authorization: Bearer <service_role_key>"
+```
+Expected: `"ok": true` and all checks `true`. If `fk_join_ok` is missing or `api_key_present: false`, the AI handler will silently exit — **AI appears broken with no visible error in the webhook response**.
+
+AI failures are SILENT: `evolution-webhook` always returns `200 OK`. Errors only appear in Supabase function logs. Check logs at: https://supabase.com/dashboard/project/fckenwdyghisdebqauxy/functions
+
+### 4. Commit and push
+```bash
+git add -A && git commit -m "..."
+git push
+```
+
+## FK Joins on ai_agents — Critical Pattern
+
+`ai_agents` has TWO foreign keys to `user_api_keys`:
+- `api_key_id` → FK name: `ai_agents_api_key_id_fkey` (AI/OpenRouter key)
+- `audio_api_key_id` → FK name: `ai_agents_audio_api_key_id_fkey` (AssemblyAI key)
+
+**Never use** `.select('*, user_api_keys(*)')` — ambiguous FK, PostgREST error → `agentError` set → AI silently stops.
+
+**Always use explicit FK hint:**
+```typescript
+.select('*, user_api_keys!ai_agents_api_key_id_fkey(*)')   // AI key
+.select('*, user_api_keys!ai_agents_audio_api_key_id_fkey(*)')  // audio key
+```
+
+Adding any new FK from `ai_agents` → `user_api_keys` requires updating this hint or fetching keys separately.
 
 ## Architecture
 
@@ -28,9 +74,9 @@ supabase functions deploy <function-name> --no-verify-jwt
 
 **React 19 + Vite (rolldown-vite) + TypeScript + Tailwind CSS + shadcn/ui**
 
-Two root layouts defined in `App.tsx`:
-- `Layout` — wraps public routes (`/`, `/auth`)
-- `DashboardLayout` — wraps all `/app/*` and `/settings` routes; enforces auth and onboarding gate
+Two root layouts in `App.tsx`:
+- `Layout` — public routes (`/`, `/auth`)
+- `DashboardLayout` — all `/app/*` and `/settings`; enforces auth + onboarding gate
 
 **Route guard logic** (`src/components/DashboardLayout.tsx`): unauthenticated → `/auth`; authenticated but `integration.is_setup_completed = false` → `/app/onboarding`; setup complete + on onboarding → `/app`.
 
@@ -41,11 +87,11 @@ Two root layouts defined in `App.tsx`:
 
 **Path alias**: `@/` → `src/`
 
-**Shared types**: `src/lib/types.ts` (app domain types). `src/lib/supabase/types.ts` is **auto-generated** — never edit it directly; regenerate with `supabase gen types typescript`.
+**Shared types**: `src/lib/types.ts` (app domain types). `src/lib/supabase/types.ts` **auto-generated** — never edit directly; regenerate with `supabase gen types typescript`.
 
 ### Backend — Supabase Edge Functions (Deno)
 
-All functions live in `supabase/functions/`. Each has its own `deno.json`. Shared utilities are in `supabase/functions/_shared/`.
+All functions in `supabase/functions/`. Each has own `deno.json`. Shared utilities in `supabase/functions/_shared/`.
 
 Key functions:
 | Function | Purpose |
@@ -54,63 +100,63 @@ Key functions:
 | `evolution-webhook/ai-handler.ts` | Background Gemini 2.5 Flash response processor |
 | `evolution-create-instance` | Creates WhatsApp instance in Evolution API |
 | `evolution-get-qr` | Fetches QR code for pairing |
-| `evolution-send-message` | Sends a message via Evolution API |
+| `evolution-send-message` | Sends message via Evolution API |
 | `evolution-sync-contacts` | Bulk-syncs contacts from Evolution API |
 | `evolution-sync-messages` | Bulk-syncs messages from Evolution API |
-| `evolution-disconnect` | Disconnects a WhatsApp instance |
+| `evolution-disconnect` | Disconnects WhatsApp instance |
 | `ai-classify-contacts` | Bulk AI classification of contacts |
 | `ai-pipeline-monitor` | AI-driven pipeline stage monitoring |
 
-All edge functions use `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS) and have `verify_jwt = false`.
+All edge functions use `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS), `verify_jwt = false`.
 
 ### Data Model
 
-**`user_integrations`**: One row per user. `instance_name` is always set to the user's UUID. `status`: `DISCONNECTED` | `WAITING_QR` | `CONNECTED`. `is_setup_completed` gates the onboarding flow.
+**`user_integrations`**: One row per user. `instance_name` always = user UUID. `status`: `DISCONNECTED` | `WAITING_QR` | `CONNECTED`. `is_setup_completed` gates onboarding.
 
-**`whatsapp_contacts`**: Keyed by `(user_id, remote_jid)`. `remote_jid` uses canonical form `<phone>@s.whatsapp.net`. Has `pipeline_stage` (default `'Em Espera'`) and `ai_agent_id` FK.
+**`whatsapp_contacts`**: Keyed by `(user_id, remote_jid)`. `remote_jid` canonical form `<phone>@s.whatsapp.net`. Has `pipeline_stage` (default `'Em Espera'`) and `ai_agent_id` FK.
 
-**`contact_identity`**: Resolves WhatsApp @lid JIDs (business accounts) to canonical phone numbers. Indexed by `(instance_id, canonical_phone)`, `lid_jid`, and `phone_jid`. The webhook upserts into this table to keep JID ↔ phone mappings fresh.
+**`contact_identity`**: Resolves WhatsApp @lid JIDs (business accounts) to canonical phones. Indexed by `(instance_id, canonical_phone)`, `lid_jid`, `phone_jid`. Webhook upserts to keep JID ↔ phone mappings fresh.
 
-**`whatsapp_messages`**: Keyed by `(user_id, message_id)`. `raw` stores the full Evolution API payload as JSONB.
+**`whatsapp_messages`**: Keyed by `(user_id, message_id)`. `raw` stores full Evolution API payload as JSONB.
 
-**`ai_agents`**: Per-user Gemini agents. DB trigger `ensure_single_default_agent` enforces only one `is_default = true` per user. Trigger `route_contact_to_agent` auto-assigns the default agent to new contacts.
+**`ai_agents`**: Per-user Gemini agents. DB trigger `ensure_single_default_agent` enforces one `is_default = true` per user. Trigger `route_contact_to_agent` auto-assigns default agent to new contacts.
 
 ### Webhook Flow (`evolution-webhook`)
 
-1. Lookup `user_integrations` by `instance_name` to resolve `user_id`
+1. Lookup `user_integrations` by `instance_name` → resolve `user_id`
 2. `connection.update` → update `status` in `user_integrations`
-3. `messages.upsert` → resolve JID via `contact_identity` → upsert `whatsapp_contacts` → upsert `whatsapp_messages` → if inbound text and `ai_agent_id` set: fire `processAiResponse` via `EdgeRuntime.waitUntil`
+3. `messages.upsert` → resolve JID via `contact_identity` → upsert `whatsapp_contacts` → upsert `whatsapp_messages` → if inbound text + `ai_agent_id` set: fire `processAiResponse` via `EdgeRuntime.waitUntil`
 
-`processAiResponse` fetches last 12 messages → calls Gemini 2.5 Flash → sends reply via Evolution API → saves reply to DB. AI processing is skipped if `ai_agent_id` is null on the contact.
+`processAiResponse` fetches last 12 messages → calls Gemini 2.5 Flash → sends reply via Evolution API → saves reply to DB. AI skipped if `ai_agent_id` null on contact.
 
 ### Evolution API — Comportamento e Armadilhas
 
 **Dois JIDs para o mesmo contato (causa raiz de duplicatas)**
 
-WhatsApp representa o mesmo contato de duas formas:
-- `<phone>@s.whatsapp.net` — JID canônico com número de telefone
-- `<lid>@lid` — JID opaco para contas business/API (não contém telefone)
+WhatsApp representa mesmo contato de duas formas:
+- `<phone>@s.whatsapp.net` — JID canônico com número
+- `<lid>@lid` — JID opaco para contas business/API (sem telefone)
 
-A Evolution API retorna **ambos como chats separados** em `/chat/findChats`. Se o código não cruzar as duas representações antes de criar contatos, o mesmo cliente aparece duplicado — um com número desconhecido (LID) e outro com telefone.
+Evolution API retorna **ambos como chats separados** em `/chat/findChats`. Sem cruzar representações antes de criar contatos, mesmo cliente aparece duplicado — um com número desconhecido (LID) e outro com telefone.
 
-**Tabela `contact_identity` — a fonte da verdade**
+**Tabela `contact_identity` — fonte da verdade**
 
-Armazena o mapeamento `lid_jid ↔ phone_jid ↔ canonical_phone` por `instance_id`. Todo código que cria contatos **deve** consultar essa tabela antes de tentar resolver um LID. A sequência correta:
+Armazena mapeamento `lid_jid ↔ phone_jid ↔ canonical_phone` por `instance_id`. Todo código que cria contatos **deve** consultar antes de resolver LID. Sequência correta:
 
-1. `extractCanonicalPhone(data)` — extrai do payload se já houver campo de telefone
-2. Consultar `contact_identity` por `lid_jid` — usa o mapeamento já aprendido
+1. `extractCanonicalPhone(data)` — extrai do payload se houver campo de telefone
+2. Consultar `contact_identity` por `lid_jid` — usa mapeamento já aprendido
 3. `resolveLidToPhone(evoUrl, evoKey, instance, lid)` — chama `/chat/findContacts` na Evolution API como último recurso
-4. Se ainda sem phone: gravar o contato com `remote_jid = lid` e `phone_number = null` (temporário)
+4. Se ainda sem phone: gravar contato com `remote_jid = lid` e `phone_number = null` (temporário)
 
 **`evolution-sync-contacts` vs `evolution-sync-messages`**
 
-Ambas criam contatos. `sync-messages` carrega `contact_identity` em um `identityMap` no início e o usa para resolver LIDs. **`sync-contacts` não faz isso** — é a causa de duplicatas quando Evolution retorna ambos os JIDs na lista de chats. Ao modificar qualquer uma, garantir que ambas usem `identityMap` de `contact_identity`.
+Ambas criam contatos. `sync-messages` carrega `contact_identity` em `identityMap` no início e usa para resolver LIDs. **`sync-contacts` não faz isso** — causa duplicatas quando Evolution retorna ambos JIDs na lista de chats. Ao modificar qualquer uma, garantir que ambas usem `identityMap` de `contact_identity`.
 
 **`contact_identity` — quando é populada**
 
-- Pelo webhook (`evolution-webhook`) ao receber `messages.upsert` com um LID resolvido
-- Por `linkLidToPhone` (`_shared/contact-linking.ts`) quando `remoteJidAlt` revela o telefone
-- Pelo `sync-contacts` ao processar chats com `canonicalPhone` resolvido
+- Webhook (`evolution-webhook`) ao receber `messages.upsert` com LID resolvido
+- `linkLidToPhone` (`_shared/contact-linking.ts`) quando `remoteJidAlt` revela telefone
+- `sync-contacts` ao processar chats com `canonicalPhone` resolvido
 
 **Resolução de LID no webhook**
 
@@ -123,7 +169,7 @@ Ambas criam contatos. `sync-messages` carrega `contact_identity` em um `identity
 
 **Campos inconsistentes da Evolution API**
 
-O payload de `messages.upsert` pode ter estruturas diferentes. O webhook normaliza:
+Payload de `messages.upsert` tem estruturas diferentes. Webhook normaliza:
 ```
 payload.data → array ou objeto → msgObj
 msgObj.key.remoteJid | msgObj.remoteJid | msgObj.jid
@@ -131,8 +177,8 @@ msgObj.pushName | msgObj.verifiedName | msgObj.name
 msgObj.messageTimestamp | msgObj.timestamp
 msgObj.message.conversation | .extendedTextMessage.text | .templateMessage...
 ```
-`findChats` retorna `remoteJid | jid | id` e `pushName | name | verifiedName | contactName | profileName | displayName`. Evolution às vezes retorna o próprio número/LID como `pushName` — sempre filtrar com `!/^\d+$/.test(pushName)`.
+`findChats` retorna `remoteJid | jid | id` e `pushName | name | verifiedName | contactName | profileName | displayName`. Evolution às vezes retorna próprio número/LID como `pushName` — sempre filtrar com `!/^\d+$/.test(pushName)`.
 
 **`merge_whatsapp_contacts` RPC**
 
-Quando duplicatas são detectadas (LID + phone para o mesmo contato), `_shared/contact-linking.ts:linkLidToPhone` chama `merge_whatsapp_contacts(p_user_id, p_primary_contact_id, p_secondary_contact_ids[])` — migra mensagens e deleta o contato secundário. O primário é sempre o JID `@s.whatsapp.net`.
+Quando duplicatas detectadas (LID + phone mesmo contato), `_shared/contact-linking.ts:linkLidToPhone` chama `merge_whatsapp_contacts(p_user_id, p_primary_contact_id, p_secondary_contact_ids[])` — migra mensagens, deleta contato secundário. Primário sempre JID `@s.whatsapp.net`.
