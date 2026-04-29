@@ -15,13 +15,14 @@ import {
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR, enUS } from 'date-fns/locale'
 import { useLanguage } from '@/hooks/use-language'
-import { Clock, MessageSquare, AlertCircle, CheckCircle2, XCircle } from 'lucide-react'
+import { Clock, MessageSquare, AlertCircle, CheckCircle2, XCircle, UserCheck } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
 const STAGES = [
   { id: 'Em Conversa', icon: MessageSquare, color: 'text-foreground', bg: 'bg-muted/80' },
+  { id: 'Contato Humano', icon: UserCheck, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950/30' },
   { id: 'Em Espera', icon: Clock, color: 'text-muted-foreground', bg: 'bg-muted/40' },
   { id: 'Resolvido', icon: CheckCircle2, color: 'text-muted-foreground', bg: 'bg-muted/40' },
   { id: 'Perdido', icon: XCircle, color: 'text-muted-foreground', bg: 'bg-muted/40' },
@@ -68,6 +69,7 @@ export default function Pipeline() {
   const groupedContacts = useMemo(() => {
     const grp: Record<string, typeof contacts> = {
       'Em Conversa': [],
+      'Contato Humano': [],
       'Em Espera': [],
       Resolvido: [],
       Perdido: [],
