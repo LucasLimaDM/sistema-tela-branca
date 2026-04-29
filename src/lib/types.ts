@@ -33,6 +33,7 @@ export interface AIAgent {
   model_id: string
   memory_limit: number
   message_delay: number
+  human_handoff_enabled: boolean
   is_active: boolean
   is_default?: boolean
   created_at: string

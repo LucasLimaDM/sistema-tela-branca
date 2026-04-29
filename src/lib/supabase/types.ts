@@ -20,6 +20,7 @@ export type Database = {
           audio_api_key_id: string | null
           created_at: string | null
           description: string | null
+          human_handoff_enabled: boolean
           id: string
           is_active: boolean | null
           is_default: boolean
@@ -36,6 +37,7 @@ export type Database = {
           audio_api_key_id?: string | null
           created_at?: string | null
           description?: string | null
+          human_handoff_enabled?: boolean
           id?: string
           is_active?: boolean | null
           is_default?: boolean
@@ -52,6 +54,7 @@ export type Database = {
           audio_api_key_id?: string | null
           created_at?: string | null
           description?: string | null
+          human_handoff_enabled?: boolean
           id?: string
           is_active?: boolean | null
           is_default?: boolean
@@ -493,3 +496,5 @@ export const Constants = {
     Enums: {},
   },
 } as const
+A new version of Supabase CLI is available: v2.95.4 (currently installed v2.90.0)
+We recommend updating regularly for new features and bug fixes: https://supabase.com/docs/guides/cli/getting-started#updating-the-supabase-cli
