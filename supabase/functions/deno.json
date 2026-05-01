@@ -1,0 +1,16 @@
+{
+  "_versions": {
+    "ai-classify-contacts": 22,
+    "ai-pipeline-monitor": 22,
+    "evolution-create-instance": 21,
+    "evolution-disconnect": 21,
+    "evolution-get-qr": 21,
+    "evolution-send-message": 21,
+    "evolution-sync-contacts": 29,
+    "evolution-sync-messages": 31,
+    "evolution-webhook": 27,
+    "evolution-debug": 13,
+    "dedupe-lid-contacts": 4,
+    "sync-messages-trace": 5
+  }
+}
